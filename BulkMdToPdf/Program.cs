@@ -17,6 +17,7 @@ namespace BulkMdToPdf
             {
                 Logger.Error("Error: DocumentPath is invalid.");
                 Console.WriteLine("Error: DocumentPath is invalid.");
+                return;
             }
 
             MdToPdf.ConvertMarkdownToPdf(setting, args.FirstOrDefault());
