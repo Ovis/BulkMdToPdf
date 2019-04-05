@@ -1,9 +1,7 @@
-﻿using iTextSharp.text;
-using iTextSharp.text.pdf;
-using iTextSharp.tool.xml;
-using Markdig;
+﻿using Markdig;
 using Markdig.SyntaxHighlighting;
 using NLog;
+using Rotativa.Mini;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -18,7 +16,7 @@ namespace BulkMdToPdf.Domain
 
         private static ILogger Logger = LogManager.GetCurrentClassLogger();
 
-        public static void ConvertMarkdownToPdf(Setting setting,string path)
+        public static void ConvertMarkdownToPdf(Setting setting, string path)
         {
             Setting = setting;
 
@@ -31,7 +29,7 @@ namespace BulkMdToPdf.Domain
                     Console.Write("Error : Directory does not exist.");
                     return;
                 }
-                
+
                 /* 出力フォルダ作成 */
                 var outputDirectoryPath = Path.Combine(path, "PDF");
 
@@ -73,7 +71,7 @@ namespace BulkMdToPdf.Domain
                     File.WriteAllBytes(pdfFile, pdfBytes);
                 }
             }
-            catch(Exception e)
+            catch (Exception e)
             {
                 Logger.Log(LogLevel.Error, e, e.Message);
             }
@@ -104,21 +102,18 @@ namespace BulkMdToPdf.Domain
             html.AppendLine("<html>").AppendLine("<head>").Append("<title>").Append(Path.GetFileNameWithoutExtension(path));
             html.Append("</title>");
 
-            if (Setting.EnableOutputHtml)
+            if (Setting.CssPath != null && File.Exists(Setting.CssPath))
             {
-                if (Setting.CssPath != null && File.Exists(Setting.CssPath))
-                {
-                    html.AppendLine("<style>");
+                html.AppendLine("<style>");
 
-                    using (FileStream fs = new FileStream(Setting.CssPath, FileMode.Open))
+                using (FileStream fs = new FileStream(Setting.CssPath, FileMode.Open))
+                {
+                    using (StreamReader sr = new StreamReader(fs))
                     {
-                        using (StreamReader sr = new StreamReader(fs))
-                        {
-                            html.AppendLine(sr.ReadToEnd());
-                        }
+                        html.AppendLine(sr.ReadToEnd());
                     }
-                    html.AppendLine("</style>");
                 }
+                html.AppendLine("</style>");
             }
 
             html.AppendLine("</head>").AppendLine("<body>");
@@ -140,10 +135,7 @@ namespace BulkMdToPdf.Domain
                 }
             }
 
-            if (Setting.EnableOutputHtml)
-            {
-                html.AppendLine("</body>").AppendLine("</html>");
-            }
+            html.AppendLine("</body>").AppendLine("</html>");
 
             return html.ToString();
         }
@@ -155,43 +147,15 @@ namespace BulkMdToPdf.Domain
         /// <returns></returns>
         private static byte[] MakePdfBytes(string html)
         {
-            byte[] bytes = null;
+            var options =
+              new RotativaMiniOptions()
+               .SetCopies(2)
+               .SetPageSize(Size.A4)
+               .SetPageMargins(1, 1, 5, 1);
 
-            using (var output = new MemoryStream())
-            {
-                using (var document = new Document(PageSize.A4, 40, 40, 120, 120))
-                {
-                    using (var writer = PdfWriter.GetInstance(document, output))
-                    {
-                        document.Open();
+            var pdfData = RotativaMiniConverter.ConvertHtml(Setting.WkHtmlToPdfPath, options, html);
 
-                        var css = "";
-
-                        if (Setting.CssPath != null && File.Exists(Setting.CssPath))
-                        {
-                            using (FileStream fs = new FileStream(Setting.CssPath, FileMode.Open))
-                            {
-                                using (StreamReader sr = new StreamReader(fs))
-                                {
-                                    css = sr.ReadToEnd();
-                                }
-                            }
-                        }
-
-                        using (var msCss = new MemoryStream(Encoding.UTF8.GetBytes(css)))
-                        {
-                            using (var msHtml = new MemoryStream(Encoding.UTF8.GetBytes(html)))
-                            {
-                                XMLWorkerHelper.GetInstance().ParseXHtml(writer, document, msHtml, msCss);
-                            }
-                        }
-                        document.Close();
-                    }
-                }
-                bytes = output.ToArray();
-            }
-
-            return bytes;
+            return pdfData;
         }
     }
 }
